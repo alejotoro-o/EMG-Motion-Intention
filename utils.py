@@ -145,6 +145,9 @@ def loadFeatureData(folder_path, w, w_inc):
 # Filtro de media movil
 def maf(data, p=20):
 
+    # data - 
+    # p - 
+
     dataset = []
 
     for w in data:
