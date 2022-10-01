@@ -5,6 +5,7 @@
 import os, os.path
 from statistics import mean
 import itertools
+import matplotlib.pyplot as plt
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from sklearn.model_selection import StratifiedKFold
@@ -161,3 +162,15 @@ def maf(data, p=20):
         dataset.append(np.concatenate((d, w[:,-1].reshape((w.shape[0],1))), axis=1))
 
     return dataset
+
+# Plot model loss
+def plotLoss(history):
+
+    plt.figure(figsize=(10,6))
+    plt.title('Model Loss')
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend(['Train', 'Test'], loc='upper right')
+    plt.show()

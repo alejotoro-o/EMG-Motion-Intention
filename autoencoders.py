@@ -6,7 +6,7 @@ from unicodedata import name
 import tensorflow as tf
 from keras import Model, Input, regularizers
 from keras.models import Sequential
-from keras.layers import Dense, Conv2D, MaxPool2D, UpSampling2D
+from keras.layers import Dense, Conv2D, MaxPool2D, UpSampling2D, LSTM, GRU, Attention, RepeatVector
 
 def autoencoder(encoder, decoder, input_shape):
 
@@ -56,5 +56,21 @@ def cnn_decoder(output_shape):
     return decoder_model
 
 # Sequence-to-sequence autoencoder
+def lstm_encoder(latent_dim):
+
+    encoder_model = Sequential(name='sts_encoder')
+    encoder_model.add(Dense(64, activation='relu'))
+    encoder_model.add(LSTM(32))
+    encoder_model.add(Dense(latent_dim, activation='relu'))
+
+    return encoder_model
+
+def lstm_decoder(Tx, output_shape):
+
+    decoder_model = Sequential(name='sts_decoder')
+    decoder_model.add(RepeatVector(Tx))
+    decoder_model.add(LSTM(output_shape, return_sequences=True))
+
+    return decoder_model
 
 # Variational autoencoder
