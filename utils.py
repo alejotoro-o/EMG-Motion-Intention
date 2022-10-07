@@ -1,6 +1,6 @@
-################################
-##### FUCNIONES AUXILIARES #####
-################################
+###############################
+##### AUXILIARY FUNCTIONS #####
+###############################
 
 import os, os.path
 from statistics import mean
@@ -11,55 +11,124 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.model_selection import StratifiedKFold
 import pandas as pd
 from emgFeatures import *
+import tensorflow as tf
 
-# Validacion cruzada para modelos de sklearn
+# Cross validation for sklearn models
 def cvClassifiers(X, Y, list_Classifiers, k=10):
 
-    # X - Datos de entrada
-    # Y - Etiquetas
-    # list_Classifiers - Lista de los modelos
-    # k - Numero de folds
+    ##### Input Parameters #####
+    # X - Input Data
+    # Y - Labels
+    # list_Classifiers - List with all sklearn models
+    # k - Number of folds
 
+    ##### Outputs #####
+    # train_scores - Average scores in training sets
+    # val_scores - Average scores in test sets
+    # val_cm - Confunsion matrix for test sets
+
+    # Cross validation Kfold definition
     strtfdKFold = StratifiedKFold(n_splits=k)
     kfold = strtfdKFold.split(X, Y)
 
-    acc_scores = [[] for c in list_Classifiers]
-    pre_scores = [[] for c in list_Classifiers]
-    rec_scores = [[] for c in list_Classifiers]
-    f1_scores = [[] for c in list_Classifiers]
+    # Train scores
+    train_acc_scores = [[] for c in list_Classifiers]
+    train_f1_scores = [[] for c in list_Classifiers]
 
+    # Test scores
+    val_acc_scores = [[] for c in list_Classifiers]
+    val_f1_scores = [[] for c in list_Classifiers]
+
+    # Ppredictions
     predicted_y = [[] for c in list_Classifiers]
     real_y = [[] for c in list_Classifiers]
 
-    for train_index, test_index in kfold:
+    for train_index, val_index in kfold:
         for i, c in enumerate(list_Classifiers): 
 
             model = clone(c)
 
-            X_train_cv, X_test_cv = X[train_index], X[test_index]
-            y_train_cv, y_test_cv = Y[train_index], Y[test_index]
+            X_train_cv, X_val_cv = X[train_index], X[val_index]
+            y_train_cv, y_val_cv = Y[train_index], Y[val_index]
 
             model.fit(X_train_cv, y_train_cv)
 
-            py = model.predict(X_test_cv)
+            # Train evaluation
+            py = model.predict(X_train_cv)
 
-            acc_scores[i].append(model.score(X_test_cv,y_test_cv))
-            pre_scores[i].append(precision_score(y_test_cv, py, average='macro'))
-            rec_scores[i].append(recall_score(y_test_cv, py, average='macro'))
-            f1_scores[i].append(f1_score(y_test_cv, py, average='macro'))
+            train_acc_scores[i].append(model.score(X_train_cv,y_train_cv))
+            train_f1_scores[i].append(f1_score(y_train_cv, py, average='macro'))
+
+            # Test evaluation
+            py = model.predict(X_val_cv)
+
+            val_acc_scores[i].append(model.score(X_val_cv,y_val_cv))
+            val_f1_scores[i].append(f1_score(y_val_cv, py, average='macro'))
 
             predicted_y[i] = list(itertools.chain(predicted_y[i],py.flatten().tolist()))
-            real_y[i] = list(itertools.chain(real_y[i],y_test_cv.flatten().tolist()))
+            real_y[i] = list(itertools.chain(real_y[i],y_val_cv.flatten().tolist()))
 
-    accuracy = [mean(sc)*100 for sc in acc_scores]
-    precision = [mean(sc) for sc in pre_scores]
-    recall = [mean(sc) for sc in rec_scores]
-    f1 = [mean(sc) for sc in f1_scores]
-    cm = [confusion_matrix(real_y[i],predicted_y[i]) for i in range(0,len(list_Classifiers))]
+    # Average training scores
+    train_accuracy = [mean(sc) for sc in train_acc_scores]
+    train_f1 = [mean(sc) for sc in train_f1_scores]
 
-    return accuracy, precision, recall, f1, cm
+    # Average test scores
+    val_accuracy = [mean(sc) for sc in val_acc_scores]
+    val_f1 = [mean(sc) for sc in val_f1_scores]
+    val_cm = [confusion_matrix(real_y[i],predicted_y[i]) for i in range(0,len(list_Classifiers))]
 
-# Cargar ventanas de datos sin procesar
+    train_scores = [train_accuracy, train_f1]
+    val_scores = [val_accuracy, val_f1]
+
+    return train_scores, val_scores, val_cm
+
+# Cross validation for keras models
+def cvKeras(X, Y, model, k=10):
+
+    strtfdKFold = StratifiedKFold(n_splits=k)
+    kfold = strtfdKFold.split(X, Y)
+
+    train_acc_scores = []
+    train_f1_scores = []
+
+    val_acc_scores = []
+    val_f1_scores = []
+
+    for train_index, val_index in kfold:
+
+        m = model
+        
+        X_train_cv, X_val_cv = X[train_index], X[val_index]
+        y_train_cv, y_val_cv = Y[train_index], Y[val_index]
+
+        y_train_cv_oh = tf.one_hot(y_train_cv, 5)
+        y_val_cv_oh = tf.one_hot(y_val_cv, 5)
+
+        m.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['Accuracy'])
+        m.fit(x=X_train_cv, y=y_train_cv_oh, epochs=500)
+
+        py = np.argmax(m.predict(X_train_cv), axis=1)
+        
+        train_acc_scores.append(m.evaluate(X_train_cv, y_train_cv_oh)[1])
+        train_f1_scores.append(f1_score(y_train_cv, py, average='macro'))
+
+        py = np.argmax(m.predict(X_val_cv), axis=1)
+        
+        val_acc_scores.append(m.evaluate(X_val_cv, y_val_cv_oh)[1])
+        val_f1_scores.append(f1_score(y_val_cv, py, average='macro'))
+
+    train_accuracy = mean(train_acc_scores)
+    train_f1 = mean(train_f1_scores)
+
+    val_accuracy = mean(val_acc_scores)
+    val_f1 = mean(val_f1_scores)
+
+    train_scores = [train_accuracy, train_f1]
+    val_scores = [val_accuracy, val_f1]
+
+    return train_scores, val_scores
+
+# Load raw data in windows
 def loadRawData(folder_path, w, w_inc):
 
     # folder_path - Direccion de los archivos
@@ -78,7 +147,7 @@ def loadRawData(folder_path, w, w_inc):
         data = pd.read_csv(folder_path + '/' + file, sep='\t', header=None).values[:,0:5]
         len_data = data.shape[0]
 
-        for i in range(0,len_data - w + 1,w_inc):
+        for i in range(0, len_data - w + 1, w_inc):
 
             dataset.append(data[i:i + w,:])
 
@@ -143,25 +212,53 @@ def loadFeatureData(folder_path, w, w_inc):
 
     return dataset
 
-# Filtro de media movil
+# Moving average filter
 def maf(data, p=20):
 
     # data - 
     # p - 
 
-    dataset = []
+    data = list(data)
+    maf_emg = []
 
     for w in data:
 
-        d = w[:,0:4] - np.mean(w[:,0:4], axis=0)
+        d = w - np.mean(w, axis=0)
         d = np.absolute(d)
 
         for i in range(w.shape[1]-1):
             d[:,i] = np.convolve(d[:,i], np.ones(p)/p, mode='same')
             
-        dataset.append(np.concatenate((d, w[:,-1].reshape((w.shape[0],1))), axis=1))
+        maf_emg.append(d)
 
-    return dataset
+    maf_emg = np.array(maf_emg)
+
+    return maf_emg
+
+# Extract EMG features
+def EMGfeatures(data):
+
+    d = list(data)
+
+    feature_data = []
+
+    for w in d:
+
+        d_rms = rms(w)
+        d_mav = mav(w)
+        d_zc = zeroCrossing(w)
+        d_wl = wl(w)
+        d_mdf = mdf(w)
+        d_mnf = mnf(w)
+        d_mom = mom(w, 4)
+
+        d_features = np.concatenate((d_rms, d_mav, d_zc, d_wl, d_mdf, d_mnf, d_mom))
+
+        feature_data.append(d_features)
+    
+    emg_features_data = np.array(feature_data)
+
+    return emg_features_data
 
 # Plot model loss
 def plotLoss(history):

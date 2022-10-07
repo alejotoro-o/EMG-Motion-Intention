@@ -26,6 +26,7 @@ def ann_encoder(latent_dim):
 
     encoder_model = Sequential(name='Deep_encoder')
     encoder_model.add(Dense(128, activation='relu', name='Encoder_l1'))
+    encoder_model.add(Dense(64, activation='relu', name='Encoder_l2'))
     encoder_model.add(Dense(latent_dim, activation='tanh', name='Encoder_output', activity_regularizer=regularizers.l1(10e-5)))
 
     return encoder_model
@@ -33,7 +34,8 @@ def ann_encoder(latent_dim):
 def ann_decoder(output_shape):
 
     decoder_model = Sequential(name='Deep_decoder')
-    decoder_model.add(Dense(128, activation='relu', name='Decoder_l1'))
+    decoder_model.add(Dense(64, activation='relu', name='Decoder_l1'))
+    decoder_model.add(Dense(128, activation='relu', name='Decoder_l2'))
     decoder_model.add(Dense(output_shape, activation='sigmoid', name='Decoder_output'))
 
     return decoder_model
@@ -42,17 +44,21 @@ def ann_decoder(output_shape):
 def cnn_encoder(latent_dim):
 
     encoder_model = Sequential(name='Convolutional_encoder')
-    encoder_model.add(Conv2D(16, (2,2), activation='relu', padding='same', name='Encoder_l1'))
-    encoder_model.add(MaxPool2D(latent_dim, padding='same', name='Encoder_output'))
+    encoder_model.add(Conv2D(16, (4,4), activation='relu', padding='same'))
+    encoder_model.add(MaxPool2D(latent_dim, padding='same'))
+    encoder_model.add(Conv2D(8, (2,2), activation='relu', padding='same'))
+    encoder_model.add(MaxPool2D(latent_dim, padding='same'))
 
     return encoder_model
 
-def cnn_decoder():
+def cnn_decoder(latent_dim):
 
     decoder_model = Sequential(name='Convolutional_decoder')
-    decoder_model.add(Conv2D(8, (2,2), padding='same', name='Decoder_l1'))
-    decoder_model.add(UpSampling2D((2,2), name='Decoder_l2'))
-    decoder_model.add(Conv2D(1, (2,2), padding='same', name='Decoder_output'))
+    decoder_model.add(Conv2D(8, (2,2), padding='same'))
+    decoder_model.add(UpSampling2D(latent_dim))
+    decoder_model.add(Conv2D(16, (4,4), padding='same'))
+    decoder_model.add(UpSampling2D(latent_dim))
+    decoder_model.add(Conv2D(1, (2,2), padding='same'))
 
 
     return decoder_model

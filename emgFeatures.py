@@ -1,13 +1,13 @@
-###########################################
-##### CARACTERISTICAS DE LA SEÑAL EMG #####
-###########################################
+###############################
+##### EMG SIGNAL FEATURES #####
+###############################
 
 import numpy as np
 from scipy.signal import welch
 from scipy.stats import moment
 
 
-### Caracteristicas en el dominio del tiempo ###
+### Time domain features ###
 
 # Root Mean Square (RMS)
 def rms(data):
@@ -63,7 +63,7 @@ def mom(data, moments=2):
 
     return m_data
 
-### Caracteristicas en el dominio de al frecuencia ###
+### Frequency domain features ###
 
 # Median Frequency (MDF)
 def mdf(data, fs = 1024):
