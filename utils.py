@@ -2,12 +2,15 @@
 ##### AUXILIARY FUNCTIONS #####
 ###############################
 
+from cmath import cos
+from math import radians, sin, cos, pi
 import os, os.path
+from re import L
 from statistics import mean
 import itertools
 import matplotlib.pyplot as plt
 from sklearn.base import clone
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.metrics import f1_score, confusion_matrix
 from sklearn.model_selection import StratifiedKFold
 import pandas as pd
 from emgFeatures import *
@@ -105,7 +108,7 @@ def cvKeras(X, Y, model, k=10):
         y_val_cv_oh = tf.one_hot(y_val_cv, 5)
 
         m.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['Accuracy'])
-        m.fit(x=X_train_cv, y=y_train_cv_oh, epochs=500)
+        m.fit(x=X_train_cv, y=y_train_cv_oh, epochs=10)
 
         py = np.argmax(m.predict(X_train_cv), axis=1)
         
@@ -127,6 +130,61 @@ def cvKeras(X, Y, model, k=10):
     val_scores = [val_accuracy, val_f1]
 
     return train_scores, val_scores
+
+def loadAndLabel(folder_path, w, w_inc):
+
+    # Get files from folder path
+    files = [name for name in os.listdir(folder_path)]
+    files.sort()
+
+    # Data lists
+    emg_data = []
+    class_labels = []
+    angle = []
+    torque = []
+
+    # Load files loop
+    for file in files:
+
+        print(file)
+
+        data = pd.read_csv(folder_path + '/' + file, sep='\t', header=None).values[:,0:5]
+        len_data = data.shape[0]
+
+        # Test parameters: External load [g], arm lenght [cm] and body weight [kg]
+        test_params = file.split(".")[0].split("_")[2:]
+        load = int(test_params[0])/1000
+        l = int(test_params[1])/100
+        lcm = (0.43*L)
+        arm_weight = 0.023*int(test_params[2])
+
+        # Window segmentation loop
+        for i in range(0,len_data - w + 1,w_inc):
+
+            emg_data.append(data[i:i + w,0:4])
+            angle.append(data[-1,4])
+
+            # Label windows and calculate current torque
+            if "stat" in file:
+                label = 0
+            elif "flex" in file:
+                label = 1
+            elif "ext" in file:
+                label = 2
+            elif "pron" in file:
+                label = 3
+            elif "sup" in file:
+                label = 4
+
+            if "pss" in file:
+                torque.append(0)
+            else:
+                torque.append(calTorque(angle[-1], arm_weight, load, l, lcm, label))
+
+            class_labels.append(label)
+
+
+    return emg_data, class_labels, angle, torque
 
 # Load raw data in windows
 def loadRawData(folder_path, w, w_inc):
@@ -164,7 +222,6 @@ def loadFeatureData(folder_path, w, w_inc):
     files.sort()
 
     dataset = []
-    error = 2
     angle_error_fe = 5
     angle_error_ps = 20
 
@@ -271,3 +328,15 @@ def plotLoss(history):
     plt.ylabel('Loss')
     plt.legend(['Train', 'Test'], loc='upper right')
     plt.show()
+
+# Calculate torque
+def calTorque(angle, arm_weight, load, l, lcm, movement):
+
+    rad_angle = radians(angle)
+
+    if movement == 0 or movement == 1 or movement == 2:
+        torque = (lcm*arm_weight*9.81 + l*load*9.81)*sin(rad_angle)
+    elif movement == 3 or movement == 4:
+        torque = 0.05*load*9.81*cos(pi/2 - rad_angle)
+    
+    return torque
