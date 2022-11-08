@@ -10,8 +10,8 @@ from statistics import mean
 import itertools
 import matplotlib.pyplot as plt
 from sklearn.base import clone
-from sklearn.metrics import f1_score, confusion_matrix
-from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import f1_score, confusion_matrix, mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import StratifiedKFold, KFold
 import pandas as pd
 from emgFeatures import *
 import tensorflow as tf
@@ -85,6 +85,57 @@ def cvClassifiers(X, Y, list_Classifiers, k=10):
 
     return train_scores, val_scores, val_cm
 
+# Cross validation for sklearn regression models
+def cvRegression(X, Y, labels, list_Classifiers, k=10):
+
+    # Cross validation Kfold definition
+    strtfdKFold = KFold(n_splits=k)
+    kfold = strtfdKFold.split(X, labels)
+
+    train_mae_scores = [[] for c in list_Classifiers]
+    train_mse_scores = [[] for c in list_Classifiers]
+    train_r2_scores = [[] for c in list_Classifiers]
+
+    val_mae_scores = [[] for c in list_Classifiers]
+    val_mse_scores = [[] for c in list_Classifiers]
+    val_r2_scores = [[] for c in list_Classifiers]
+
+    for train_index, val_index in kfold:
+        for i, c in enumerate(list_Classifiers): 
+
+            model = clone(c)
+
+            X_train_cv, X_val_cv = X[train_index], X[val_index]
+            y_train_cv, y_val_cv = Y[train_index], Y[val_index]
+
+            model.fit(X_train_cv, y_train_cv)
+
+            # Train evaluation
+            py = model.predict(X_train_cv)
+
+            train_mae_scores[i].append(mean_absolute_error(y_train_cv, py))
+            train_mse_scores[i].append(mean_squared_error(y_train_cv, py))
+            train_r2_scores[i].append(r2_score(y_train_cv, py))
+
+            py = model.predict(X_val_cv)
+
+            val_mae_scores[i].append(mean_absolute_error(y_val_cv, py))
+            val_mse_scores[i].append(mean_squared_error(y_val_cv, py))
+            val_r2_scores[i].append(r2_score(y_val_cv, py))
+
+    train_mae = [mean(sc) for sc in train_mae_scores]
+    train_mse = [mean(sc) for sc in train_mse_scores]
+    train_r2 = [mean(sc) for sc in train_r2_scores]
+    
+    val_mae = [mean(sc) for sc in val_mae_scores]
+    val_mse = [mean(sc) for sc in val_mse_scores]
+    val_r2 = [mean(sc) for sc in val_r2_scores]
+
+    train_scores = [train_mae, train_mse, train_r2]
+    val_scores = [val_mae, val_mse, val_r2]
+
+    return train_scores, val_scores
+
 # Cross validation for keras models
 def cvKeras(X, Y, model, k=10):
 
@@ -108,7 +159,7 @@ def cvKeras(X, Y, model, k=10):
         y_val_cv_oh = tf.one_hot(y_val_cv, 5)
 
         m.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['Accuracy'])
-        m.fit(x=X_train_cv, y=y_train_cv_oh, epochs=10)
+        m.fit(x=X_train_cv, y=y_train_cv_oh, epochs=200, batch_size=256)
 
         py = np.argmax(m.predict(X_train_cv), axis=1)
         
@@ -131,6 +182,58 @@ def cvKeras(X, Y, model, k=10):
 
     return train_scores, val_scores
 
+# Cross validation for keras regression models
+def cvKerasReg(X, Y, labels, model, k=10):
+
+    # Cross validation Kfold definition
+    strtfdKFold = StratifiedKFold(n_splits=k)
+    kfold = strtfdKFold.split(X, labels)
+
+    train_mae_scores = []
+    train_mse_scores = []
+    train_r2_scores = []
+
+    val_mae_scores = []
+    val_mse_scores = []
+    val_r2_scores = []
+
+    for train_index, val_index in kfold:
+
+        m = model
+        
+        X_train_cv, X_val_cv = X[train_index], X[val_index]
+        y_train_cv, y_val_cv = Y[train_index], Y[val_index]
+
+        m.compile(optimizer='adam', loss='mean_squared_error', metrics=['MeanAbsoluteError','MeanSquaredError'])
+        m.fit(x=X_train_cv, y=y_train_cv, epochs=500, batch_size=256)
+
+        py = m.predict(X_train_cv)
+
+        eval = m.evaluate(X_train_cv, y_train_cv)        
+        train_mae_scores.append(eval[1])
+        train_mse_scores.append(eval[2])
+        train_r2_scores.append(r2_score(y_train_cv, py))
+
+        py = m.predict(X_val_cv)
+        
+        eval = m.evaluate(X_val_cv, y_val_cv)        
+        val_mae_scores.append(eval[1])
+        val_mse_scores.append(eval[2])
+        val_r2_scores.append(r2_score(y_val_cv, py))
+
+    train_mae = mean(train_mae_scores)
+    train_mse = mean(train_mse_scores)
+    train_r2 = mean(train_r2_scores)
+    
+    val_mae = mean(val_mae_scores)
+    val_mse = mean(val_mse_scores)
+    val_r2 = mean(val_r2_scores)
+
+    train_scores = [train_mae, train_mse, train_r2]
+    val_scores = [val_mae, val_mse, val_r2]
+
+    return train_scores, val_scores
+
 def loadAndLabel(folder_path, w, w_inc):
 
     # Get files from folder path
@@ -141,6 +244,7 @@ def loadAndLabel(folder_path, w, w_inc):
     emg_data = []
     class_labels = []
     angle = []
+    speed = []
     torque = []
 
     # Load files loop
@@ -153,16 +257,14 @@ def loadAndLabel(folder_path, w, w_inc):
 
         # Test parameters: External load [g], arm lenght [cm] and body weight [kg]
         test_params = file.split(".")[0].split("_")[2:]
-        load = int(test_params[0])/1000
-        l = int(test_params[1])/100
-        lcm = (0.43*L)
-        arm_weight = 0.023*int(test_params[2])
 
         # Window segmentation loop
         for i in range(0,len_data - w + 1,w_inc):
 
-            emg_data.append(data[i:i + w,0:4])
-            angle.append(data[-1,4])
+            d = data[i:i + w,:]
+            emg_data.append(d[:,0:4])
+            angle.append(d[-1,4])
+            speed.append((d[-1,4]-d[0,4])/0.2)
 
             # Label windows and calculate current torque
             if "stat" in file:
@@ -176,15 +278,12 @@ def loadAndLabel(folder_path, w, w_inc):
             elif "sup" in file:
                 label = 4
 
-            if "pss" in file:
-                torque.append(0)
-            else:
-                torque.append(calTorque(angle[-1], arm_weight, load, l, lcm, label))
+            torque.append(calTorque(angle[-1], test_params, label))
 
             class_labels.append(label)
 
 
-    return emg_data, class_labels, angle, torque
+    return emg_data, class_labels, angle, speed, torque
 
 # Load raw data in windows
 def loadRawData(folder_path, w, w_inc):
@@ -330,13 +429,21 @@ def plotLoss(history):
     plt.show()
 
 # Calculate torque
-def calTorque(angle, arm_weight, load, l, lcm, movement):
+def calTorque(angle, test_params, movement):
 
     rad_angle = radians(angle)
 
-    if movement == 0 or movement == 1 or movement == 2:
+    load = int(test_params[0])/1000
+    l = int(test_params[1])/100
+    lcm = (0.43*l)
+    arm_weight = 0.023*int(test_params[2])
+    hand_weight = 0.0057*int(test_params[2])
+
+    if movement == 0 or movement == 1:
         torque = (lcm*arm_weight*9.81 + l*load*9.81)*sin(rad_angle)
+    elif movement == 2:
+        torque = -(lcm*arm_weight*9.81 + l*load*9.81)*sin(rad_angle)
     elif movement == 3 or movement == 4:
-        torque = 0.05*load*9.81*cos(pi/2 - rad_angle)
+        torque = l*(hand_weight*9.81 + load*9.81)*sin(rad_angle)
     
     return torque

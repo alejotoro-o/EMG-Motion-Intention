@@ -27,7 +27,7 @@ def ann_encoder(latent_dim):
     encoder_model = Sequential(name='Deep_encoder')
     encoder_model.add(Dense(128, activation='relu', name='Encoder_l1'))
     encoder_model.add(Dense(64, activation='relu', name='Encoder_l2'))
-    encoder_model.add(Dense(latent_dim, activation='tanh', name='Encoder_output', activity_regularizer=regularizers.l1(10e-5)))
+    encoder_model.add(Dense(latent_dim, activation='relu', name='Encoder_output', activity_regularizer=regularizers.l1(10e-5)))
 
     return encoder_model
 

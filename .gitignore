@@ -1,4 +1,7 @@
-# Carpetas
+# Folders
 __pycache__
 logs
+
+# Files
 *.h5
+data_cleaning.ipynb
