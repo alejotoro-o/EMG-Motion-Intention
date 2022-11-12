@@ -205,7 +205,7 @@ def cvKerasReg(X, Y, labels, model, k=10):
         y_train_cv, y_val_cv = Y[train_index], Y[val_index]
 
         m.compile(optimizer='adam', loss='mean_squared_error', metrics=['MeanAbsoluteError','MeanSquaredError'])
-        m.fit(x=X_train_cv, y=y_train_cv, epochs=500, batch_size=256)
+        m.fit(x=X_train_cv, y=y_train_cv, epochs=200, batch_size=256)
 
         py = m.predict(X_train_cv)
 
@@ -246,6 +246,7 @@ def loadAndLabel(folder_path, w, w_inc):
     angle = []
     speed = []
     torque = []
+    dt = w/1000
 
     # Load files loop
     for file in files:
@@ -257,6 +258,7 @@ def loadAndLabel(folder_path, w, w_inc):
 
         # Test parameters: External load [g], arm lenght [cm] and body weight [kg]
         test_params = file.split(".")[0].split("_")[2:]
+        speed_prev = 0
 
         # Window segmentation loop
         for i in range(0,len_data - w + 1,w_inc):
@@ -264,7 +266,9 @@ def loadAndLabel(folder_path, w, w_inc):
             d = data[i:i + w,:]
             emg_data.append(d[:,0:4])
             angle.append(d[-1,4])
-            speed.append((d[-1,4]-d[0,4])/0.2)
+            speed.append((d[-1,4]-d[0,4])/dt)
+            acel = (speed[-1] - speed_prev)/dt
+            speed_prev = speed[-1]
 
             # Label windows and calculate current torque
             if "stat" in file:
@@ -278,7 +282,7 @@ def loadAndLabel(folder_path, w, w_inc):
             elif "sup" in file:
                 label = 4
 
-            torque.append(calTorque(angle[-1], test_params, label))
+            torque.append(calTorque(angle[-1], test_params, acel, label))
 
             class_labels.append(label)
 
@@ -429,21 +433,27 @@ def plotLoss(history):
     plt.show()
 
 # Calculate torque
-def calTorque(angle, test_params, movement):
+def calTorque(angle, test_params, acel, movement):
 
     rad_angle = radians(angle)
+    rad_acel = radians(acel)
 
     load = int(test_params[0])/1000
     l = int(test_params[1])/100
     lcm = (0.43*l)
-    arm_weight = 0.023*int(test_params[2])
-    hand_weight = 0.0057*int(test_params[2])
+    m = int(test_params[2]) # Body Weight
+    arm_weight = 0.023*m
+    hand_weight = 0.0057*m
+    arm_mt = arm_weight + load
+    hand_mt = hand_weight + load
 
     if movement == 0 or movement == 1:
-        torque = (lcm*arm_weight*9.81 + l*load*9.81)*sin(rad_angle)
+        torque = (arm_mt*lcm**2 + ((1/3)*arm_mt*l**2))*rad_acel + 9.81*(lcm*arm_weight + l*load)*sin(rad_angle)
     elif movement == 2:
-        torque = -(lcm*arm_weight*9.81 + l*load*9.81)*sin(rad_angle)
-    elif movement == 3 or movement == 4:
-        torque = l*(hand_weight*9.81 + load*9.81)*sin(rad_angle)
+        torque = -(arm_mt*lcm**2 + ((1/3)*arm_mt*l**2))*rad_acel - 9.81*(lcm*arm_weight + l*load)*sin(rad_angle)
+    elif movement == 3:
+        torque = (hand_mt*l**2 + ((1/3)*hand_mt*(2*l)**2))*rad_acel + 9.81*l*(-hand_weight*sin(rad_angle) + load)
+    elif movement == 4:
+        torque = -(hand_mt*l**2 + ((1/3)*hand_mt*(2*l)**2))*rad_acel + 9.81*l*(-hand_weight*sin(rad_angle) + load)
     
     return torque

@@ -2,14 +2,14 @@
 ##### SKLEARN AND TENSORFLOW MACHINE LEARNING MODELS #####
 ##########################################################
 
-from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.svm import SVC, SVR
 from sklearn.ensemble import BaggingClassifier, AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier, StackingClassifier
 from sklearn.ensemble import BaggingRegressor, AdaBoostRegressor, GradientBoostingRegressor, RandomForestRegressor, StackingRegressor
-from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge, Lasso, ElasticNet, Lars
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 from keras.models import Sequential
@@ -93,24 +93,18 @@ def gru_rnn():
 # Sklearn regresion machine learning models 
 def sklearnModelsReg():
 
-    dt = DecisionTreeRegressor()
-    knn = KNeighborsRegressor()
     lr = LinearRegression()
+    rr = Ridge()
+    lsr = Lasso()
+    en = ElasticNet()
+    lars = Lars()
     mlp = MLPRegressor(max_iter=200)
     svm = SVR()
     bg = BaggingRegressor()
-    ab = AdaBoostRegressor()
-    gb = GradientBoostingRegressor()
     rf = RandomForestRegressor()
-    clfs = [
-        ('kn', KNeighborsRegressor()),
-        ('dt', DecisionTreeRegressor())
-    ]
-    st = StackingRegressor(clfs, final_estimator=LinearRegression())
 
-    models_names_reg = ['Decision Tree', 'KNN', 'Linear Regression', 'MLP', 'SVM', 'Bagging', 'AdaBoost', 
-                    'Gradient Boosting', 'Random Forest', 'Stacking']
-    models_reg = [dt, knn, lr, mlp, svm, bg, ab, gb, rf, st]
+    models_names_reg = ['Linear Regression', 'Ridge', 'Lasso', 'Elastic-Net', 'LARS', 'MLP', 'SVM', 'Bagging', 'Random Forest']
+    models_reg = [lr, rr, lsr, en, lars, mlp, svm, bg, rf]
 
     return models_reg, models_names_reg
 
