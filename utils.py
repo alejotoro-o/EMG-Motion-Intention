@@ -234,6 +234,7 @@ def cvKerasReg(X, Y, labels, model, k=10):
 
     return train_scores, val_scores
 
+# Load original files
 def loadAndLabel(folder_path, w, w_inc):
 
     # Get files from folder path
@@ -253,7 +254,7 @@ def loadAndLabel(folder_path, w, w_inc):
 
         print(file)
 
-        data = pd.read_csv(folder_path + '/' + file, sep='\t', header=None).values[:,0:5]
+        data = pd.read_csv(folder_path + '/' + file, sep='\t', header=None).values
         len_data = data.shape[0]
 
         # Test parameters: External load [g], arm lenght [cm] and body weight [kg]
@@ -283,6 +284,55 @@ def loadAndLabel(folder_path, w, w_inc):
                 label = 4
 
             torque.append(calTorque(angle[-1], test_params, acel, label))
+
+            class_labels.append(label)
+
+
+    return emg_data, class_labels, angle, speed, torque
+
+# Load preprocessed files
+def loadAndLabelV2(folder_path, w, w_inc):
+
+    # Get files from folder path
+    files = [name for name in os.listdir(folder_path)]
+    files.sort()
+
+    # Data lists
+    emg_data = []
+    class_labels = []
+    angle = []
+    speed = []
+    torque = []
+
+    # Load files loop
+    for file in files:
+
+        print(file)
+
+        data = pd.read_csv(folder_path + '/' + file, sep='\t', header=None).values
+        len_data = data.shape[0]
+
+        # Window segmentation loop
+        for i in range(0,len_data - w + 1,w_inc):
+
+            d = data[i:i + w,:]
+            emg_data.append(d[:,0:4])
+            angle.append(d[-1,4])
+            speed.append(d[-1,5])
+            torque.append(d[-1,6])
+
+
+            # Label windows and calculate current torque
+            if "stat" in file:
+                label = 0
+            elif "flex" in file:
+                label = 1
+            elif "ext" in file:
+                label = 2
+            elif "pron" in file:
+                label = 3
+            elif "sup" in file:
+                label = 4
 
             class_labels.append(label)
 
@@ -420,6 +470,23 @@ def EMGfeatures(data):
 
     return emg_features_data
 
+# Extract RMS EMG
+def EMGRMS(data):
+
+    d = list(data)
+
+    feature_data = []
+
+    for w in d:
+
+        d_rms = rms(w)
+
+        feature_data.append(d_rms)
+    
+    emg_features_data = np.array(feature_data)
+
+    return emg_features_data
+
 # Plot model loss
 def plotLoss(history):
 
@@ -435,8 +502,8 @@ def plotLoss(history):
 # Calculate torque
 def calTorque(angle, test_params, acel, movement):
 
-    rad_angle = radians(angle)
-    rad_acel = radians(acel)
+    rad_angle = np.radians(angle)
+    rad_acel = np.radians(acel)
 
     load = int(test_params[0])/1000
     l = int(test_params[1])/100
@@ -448,12 +515,12 @@ def calTorque(angle, test_params, acel, movement):
     hand_mt = hand_weight + load
 
     if movement == 0 or movement == 1:
-        torque = (arm_mt*lcm**2 + ((1/3)*arm_mt*l**2))*rad_acel + 9.81*(lcm*arm_weight + l*load)*sin(rad_angle)
+        torque = (arm_mt*lcm**2 + ((1/3)*arm_mt*l**2))*rad_acel + 9.81*(lcm*arm_weight + l*load)*np.sin(rad_angle)
     elif movement == 2:
-        torque = -(arm_mt*lcm**2 + ((1/3)*arm_mt*l**2))*rad_acel - 9.81*(lcm*arm_weight + l*load)*sin(rad_angle)
+        torque = -(arm_mt*lcm**2 + ((1/3)*arm_mt*l**2))*rad_acel - 9.81*(lcm*arm_weight + l*load)*np.sin(rad_angle)
     elif movement == 3:
-        torque = (hand_mt*l**2 + ((1/3)*hand_mt*(2*l)**2))*rad_acel + 9.81*l*(-hand_weight*sin(rad_angle) + load)
+        torque = (hand_mt*l**2 + ((1/3)*hand_mt*(2*l)**2))*rad_acel + 9.81*l*(-hand_weight*np.sin(rad_angle) + load)
     elif movement == 4:
-        torque = -(hand_mt*l**2 + ((1/3)*hand_mt*(2*l)**2))*rad_acel + 9.81*l*(-hand_weight*sin(rad_angle) + load)
+        torque = -(hand_mt*l**2 + ((1/3)*hand_mt*(2*l)**2))*rad_acel - 9.81*l*(-hand_weight*np.sin(rad_angle) + load)
     
     return torque

@@ -5,3 +5,5 @@ logs
 # Files
 *.h5
 data_cleaning.ipynb
+data_exploration.ipynb
+test_raw.ipynb
