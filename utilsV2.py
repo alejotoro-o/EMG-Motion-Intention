@@ -247,6 +247,31 @@ def featureExtraction(files, features=['rms']):
 
     return featuredFiles
 
+# Stack data for training
+def stackFiles(files, sel_test=['flex','ext']):
 
+    emgData = []
+    angleData = []
+    torqueData = []
+
+    for subject, data in files.items():
+
+        for test, values in data.items():
+
+            t = test.split('_')
+
+            if test != 'subject_info':
+
+                if t[1] in sel_test:
+                    emgData.append(values[0])
+                    angleData.append(np.array(values[1]).reshape((-1,1)))
+                    torqueData.append(np.array(values[2]).reshape((-1,1)))
+
+    emgData = np.vstack(emgData)
+    angleData = np.vstack(angleData)
+    torqueData = np.vstack(torqueData)
+
+
+    return emgData, angleData, torqueData
 
 
