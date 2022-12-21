@@ -11,7 +11,6 @@ import itertools
 import matplotlib.pyplot as plt
 from sklearn.base import clone
 from sklearn.metrics import f1_score, confusion_matrix, mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import StratifiedKFold, KFold
 import pandas as pd
 from emgFeatures import *
 import tensorflow as tf
@@ -88,7 +87,7 @@ def filterEMG(files, cutOffL, cutOffH, fs):
 
                 values[:,0:3] = lfilter(b,a,values[:,0:3],axis=0)
 
-                data[test] = values[200:,:]
+                data[test] = values[400:,:]
 
         filteredFiles[subject] = data
 
@@ -247,8 +246,55 @@ def featureExtraction(files, features=['rms']):
 
     return featuredFiles
 
+# Normalize EMG data
+def normalizeEMG(files):
+
+    normalizedFiles = {}
+
+    flexScalers = {}
+    extScalers = {}
+    pronScalers = {}
+    supScalers = {}
+
+    for subject, data in files.items():
+
+        for test, values in data.items():
+
+            if '1RM' in test:
+
+                if 'flex' in test:
+                    flexScalers[subject] = np.max(values[0])
+                if 'ext' in test:
+                    extScalers[subject] = np.max(values[0])
+                if 'pron' in test:
+                    pronScalers[subject] = np.max(values[0])
+                if 'sup' in test:
+                    supScalers[subject] = np.max(values[0])
+
+    for subject, data in files.items():
+
+        for test, values in data.items():
+
+            if test != 'subject_info':
+
+                if 'flex' in test:
+                    values = values[0]/flexScalers[subject]
+                if 'ext' in test:
+                    values = values[0]/extScalers[subject]
+                if 'pron' in test:
+                    values = values[0]/pronScalers[subject]
+                if 'sup' in test:
+                    values = values[0]/supScalers[subject]
+
+            data[test][0] = values
+
+        normalizedFiles[subject] = data
+
+
+    return normalizedFiles
+
 # Stack data for training
-def stackFiles(files, sel_test=['flex','ext']):
+def stackFiles(files, sel_subjects='all', sel_test=['flex','ext']):
 
     emgData = []
     angleData = []
@@ -256,16 +302,18 @@ def stackFiles(files, sel_test=['flex','ext']):
 
     for subject, data in files.items():
 
-        for test, values in data.items():
+        if subject in sel_subjects or 'all' in sel_subjects:
 
-            t = test.split('_')
+            for test, values in data.items():
 
-            if test != 'subject_info':
+                t = test.split('_')
 
-                if t[1] in sel_test:
-                    emgData.append(values[0])
-                    angleData.append(np.array(values[1]).reshape((-1,1)))
-                    torqueData.append(np.array(values[2]).reshape((-1,1)))
+                if test != 'subject_info':
+
+                    if t[1] in sel_test:
+                        emgData.append(values[0])
+                        angleData.append(np.array(values[1]).reshape((-1,1)))
+                        torqueData.append(np.array(values[2]).reshape((-1,1)))
 
     emgData = np.vstack(emgData)
     angleData = np.vstack(angleData)
@@ -274,4 +322,10 @@ def stackFiles(files, sel_test=['flex','ext']):
 
     return emgData, angleData, torqueData
 
+def filter(data, cf, fs):
 
+    b, a = butter(4, cf, fs=fs, btype='low', analog=False)
+
+    filtered_data = lfilter(b,a,data,axis=0)
+
+    return filtered_data
