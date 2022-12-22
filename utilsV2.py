@@ -310,7 +310,7 @@ def stackFiles(files, sel_subjects='all', sel_test=['flex','ext']):
 
                 if test != 'subject_info':
 
-                    if t[1] in sel_test:
+                    if any(t in test for t in sel_test):
                         emgData.append(values[0])
                         angleData.append(np.array(values[1]).reshape((-1,1)))
                         torqueData.append(np.array(values[2]).reshape((-1,1)))

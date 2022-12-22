@@ -46,3 +46,37 @@ class ERLS:
                             [self.ek[0,0]]], dtype=float)
 
         return y_hat, theta
+
+    def resetShiftRegisters(self):
+
+        self.phik = np.zeros((6,1))
+        self.uk = np.zeros((6,1))
+        self.yk = np.zeros((2,1))
+        self.ek = np.zeros((2,1)) 
+
+    def setTheta(self,theta):
+
+        self.thetak = theta
+
+    def modelPredict(self,u1,u2):
+
+        self.phik = np.array([[self.uk[1,0]],
+                              [self.uk[2,0]],
+                              [self.uk[4,0]],
+                              [self.uk[5,0]],
+                              [-self.yk[0,0]],
+                              [-self.yk[1,0]]], dtype=float)
+        self.y_hat = np.matmul(self.phik.T,self.thetak)
+        y_hat = self.y_hat
+
+        # Shift registers
+        self.uk = np.array([[u1],
+                            [self.uk[0,0]],
+                            [self.uk[1,0]],
+                            [u2],
+                            [self.uk[3,0]],
+                            [self.uk[4,0]]], dtype=float)
+        self.yk = np.array([[y_hat],
+                            [self.yk[0,0]]], dtype=float)
+
+        return y_hat
